@@ -10,3 +10,4 @@ csv = "1.1.6"
 serde = { version = "1.0.141", features = ["derive"] }
 rust_decimal = "1.26"
 rust_decimal_macros = "1.26"
+thiserror = "1.0.32"
