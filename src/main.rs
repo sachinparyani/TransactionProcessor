@@ -16,7 +16,7 @@ struct TransactionEntry<'a> {
     amount: Option<Decimal>,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Serialize)]
 struct ClientInfo {
     available: Decimal,
     held: Decimal,
@@ -51,17 +51,16 @@ enum Error {
 }
 
 fn process_transactions<R>(
-    mut rdr: Reader<R>,
+    rdr: &mut Reader<R>,
     mut raw_record: ByteRecord,
     client_info: &mut HashMap<u16, ClientInfo>,
-    headers: ByteRecord,
 ) -> Result<(), Error>
 where
     R: io::Read,
 {
     let mut tx_map: HashMap<u32, Transaction> = HashMap::new();
     while rdr.read_byte_record(&mut raw_record)? {
-        let record: TransactionEntry = raw_record.deserialize(Some(&headers))?;
+        let record: TransactionEntry = raw_record.deserialize(Some(rdr.byte_headers()?))?;
 
         // if the client is locked, continue
         if client_info.contains_key(&record.client) {
@@ -258,7 +257,7 @@ where
     Ok(())
 }
 
-fn process_transactions_from_path(path: String) -> Result<(), Error> {
+fn process_transactions_from_path(path: &str) -> Result<(), Error> {
     // create a reader for the csv file
     let mut rdr = csv::ReaderBuilder::new().
         trim(Trim::All).
@@ -267,11 +266,10 @@ fn process_transactions_from_path(path: String) -> Result<(), Error> {
 
     // Reading into a ByteRecord instead of a StringRecord for best performance
     let raw_record = csv::ByteRecord::new();
-    let headers = rdr.byte_headers()?.clone();
 
     let mut client_info: HashMap<u16, ClientInfo> = HashMap::new();
 
-    process_transactions(rdr, raw_record, &mut client_info, headers)?;
+    process_transactions(&mut rdr, raw_record, &mut client_info)?;
     write_client_info(&client_info)?;
     Ok(())
 }
@@ -299,7 +297,7 @@ fn main() {
     let args: Vec<String> = env::args().collect();
     // assert that there is only one argument provided
     assert_eq!(args.len(), 2);
-    let file_path = args[1].clone();
+    let file_path = &args[1];
     match process_transactions_from_path(file_path) {
         Ok(_) => {}
         Err(e) => {
